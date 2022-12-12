@@ -8,13 +8,9 @@ news_dir = os.path.join(os.path.curdir, 'news')
 
 api_key = 'e6138c2b6ff8420ab9ee3f5d803486dc'
 
-def cleanup_news_dir():
-    for file_name in os.listdir(news_dir):
-        os.remove(os.path.join(news_dir, file_name))
-
+articles = {}
 
 def fetch_articles():
-    
     with open('subscriptions.json', 'r') as f:
         subscriptions = json.load(f)
     
@@ -22,8 +18,6 @@ def fetch_articles():
     for subscriber in subscriptions:
         topics += subscriptions[subscriber]
     topics = list(set(topics))
-
-    cleanup_news_dir()
 
     for topic in topics:
         url = f'https://newsapi.org/v2/everything?q={topic}&from=2022-11-12&' \
@@ -37,24 +31,25 @@ def fetch_articles():
                 message += '\t' + article['title'] + '\n'
                 message += '\t' + article['description'] + '\n'
                 message += article['url'] + '\n'*3
+        message = message.encode('utf-8')
+        articles[topic.replace(' ', '_')] = message
 
-#        message = message.encode('utf-8')
-        with open(os.path.join(news_dir, topic+'.txt'), 'w', encoding='utf-8') as f:
-            f.write(message)
+def compose_email(user_email):
+    with open('subscriptions.json', 'r') as f:
+        subscriptions = json.load(f)
+    if (user_email in subscriptions.keys()):
+        topics = subscriptions[user_email]
+        message = "Subject: Today's news \n\n"
+        message = message.encode('utf-8')
+        for topic in topics:
+            message += articles[topic.replace(' ', '_')]
+        return message
 
 if __name__ == '__main__':
     fetch_articles()
     with open('subscriptions.json', 'r') as f:
         subscriptions = json.load(f)
     
-    message = "Subject: Today's news \n"
-    for subscriber in subscriptions:
-        if subscriber == 'adamtemplin92@gmail.com':
-            topics = subscriptions[subscriber]
-            for topic in topics:
-                with open(os.path.join(news_dir, topic+'.txt'), 'r', encoding='utf-8') as f:
-                    message += topic.title() + '\n' + f.read()
-            message = message.encode('utf-8')
-            send_mail.send_email(message=message)
-
-
+    fetch_articles()
+    message = compose_email('adamtemplin92@gmail.com')
+    send_mail.send_email(message=message)
